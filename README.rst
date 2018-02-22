@@ -1,4 +1,4 @@
-Python Maxmind DB encoder
+Python MMDB encoder
 =========================
 
 At Cloudflare, as part of the network automation, we build our IP prefix tables.
@@ -16,3 +16,16 @@ An example of how to use it:
     data = enc.insert_data({'info': 'Hello World'})
     enc.insert_network(u'10.0.0.0/24', data)
     enc.write_file('hello.mmdb')
+
+Installation
+============
+
+From source:
+::
+    $ ./setup.py install
+    $ 
+
+From pypi:
+::
+    $ pip install py-mmdb-encoder
+    $ 

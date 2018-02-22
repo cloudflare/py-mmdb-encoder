@@ -18,13 +18,15 @@ setup(
     author='Louis Poinsignon / Cloudflare',
     author_email='louis@cloudflare.com',
 
+    license='BSD 3',
+
     classifiers=[
         'Development Status :: 4 - Beta',
 
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Build Tools',
 
-        'License :: ? :: ?',
+        'License :: OSI Approved :: BSD License',
 
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
