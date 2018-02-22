@@ -131,7 +131,7 @@ class Encoder():
                 carrydata = curnode.data
                 curnode.data = None
                 self.node_count += 1
-            elif carrydata != None and i < prefixlen-1 :
+            elif carrydata != None and i <= prefixlen-1:
                 curnode.data = None
                 if val == 0:
                     carrynode = Node()
