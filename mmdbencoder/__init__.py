@@ -351,9 +351,31 @@ class Encoder():
         if fieldid > 7:
             fieldid_write = 0
 
-        tow = length&0x1f | (fieldid_write&0x7)<<5
+        length_mod = length
+        if length >= 65821:
+            length_mod = 31
+        elif length >= 285:
+            length_mod = 30
+        elif length >= 29:
+            length_mod = 29
+
+        tow = length_mod&0x1f | (fieldid_write&0x7)<<5
         Encoder._write_v(buf, tow)
-        written += 1 # When writing on a file, doesn't return anything
+        written += 1
+        
+        if length >= 65821:
+            Encoder._write_v(buf, (length - 65821)>>16&0xff)
+            Encoder._write_v(buf, (length - 65821)>>8&0xff)
+            Encoder._write_v(buf, (length - 65821)&0xff)
+            written += 3
+        elif length >= 285:
+            Encoder._write_v(buf, (length - 285)>>8&0xff)
+            Encoder._write_v(buf, (length - 285)&0xff)
+            written += 2
+        elif length >= 29:
+            Encoder._write_v(buf, length - 29)
+            written += 1 # When writing on a file, doesn't return anything
+
         if fieldid > 7:
             tow = fieldid-7
             Encoder._write_v(buf, tow)

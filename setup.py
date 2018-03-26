@@ -10,7 +10,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='py-mmdb-encoder',
-    version='1.0.1',
+    version='1.0.3',
     description='Python MMDB encoder',
 
     url='https://github.com/cloudflare/py-mmdb-encoder',
