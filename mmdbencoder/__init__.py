@@ -17,6 +17,7 @@ class Node():
         self.data_schema = {}
 
         self.written_id = None
+        self.final = 0
 
 class Pointer():
     def __init__(self, addr):
@@ -101,10 +102,9 @@ class Encoder():
         cutsize = ipnet.prefixlen/8 + int(ipnet.prefixlen%8 != 0)
         return arr[0:cutsize]
 
-    def _add_to_trie(self, ipnum, prefixlen, max_prefixlen, keyid, strict = True, last=False):        
+    def _add_to_trie(self, ipnum, prefixlen, max_prefixlen, keyid, strict = True, final = True, originalprefixlen = 0):        
         curnode = self.trie
         parentnode = None
-
         carrydata = None
         for i in range(0, prefixlen):
             val = int((ipnum&(0x1<<(max_prefixlen-(i+1))))>>(max_prefixlen-(i+1)))
@@ -129,18 +129,23 @@ class Encoder():
                 raise Exception('Encoder: add_to_trie: try setting data on a non-final: %s already has child. Not updating in strict mode.' % ipnum)
             elif curnode.data != None and i < prefixlen-1 and carrydata == None:
                 carrydata = curnode.data
+                carrylen = curnode.final
                 curnode.data = None
+                curnode.final = 0
                 self.node_count += 1
             elif carrydata != None and i <= prefixlen-1:
                 curnode.data = None
+                curnode.final = 0
                 if val == 0:
                     carrynode = Node()
                     carrynode.data = carrydata
                     parentnode.right = carrynode
+                    carrynode.final = carrylen
                 elif val == 1:
                     carrynode = Node()
                     carrynode.data = carrydata
                     parentnode.left = carrynode
+                    carrynode.final = carrylen
 
             if i == prefixlen-1:
                 if curnode.data is not None and strict:
@@ -150,20 +155,42 @@ class Encoder():
                     raise Exception('Encoder: add_to_trie: try setting data on a non-final: %s already has child. Not updating in strict mode.' % ipnum)
 
                 if not strict and (curnode.left is not None or curnode.right is not None):
+                    oplen = prefixlen
+                    if originalprefixlen != 0:
+                        oplen = originalprefixlen
                     if curnode.left is not None:
                         newipnum = ipnum | 1<<(max_prefixlen-i-2)
-                        self._add_to_trie(newipnum, prefixlen+1, max_prefixlen, keyid, strict, last=True)
+                        self._add_to_trie(newipnum, prefixlen+1, max_prefixlen, keyid, strict=False, final=False, originalprefixlen=oplen)
                     if curnode.right is not None:
                         newipnum = ipnum
-                        self._add_to_trie(newipnum, prefixlen+1, max_prefixlen, keyid, strict, last=True)
-                elif curnode.data is None or not last: # Fixme: cannot change me otherwise
+                        self._add_to_trie(newipnum, prefixlen+1, max_prefixlen, keyid, strict=False, final=False, originalprefixlen=oplen)
+                elif curnode.data is None or final or (not final and originalprefixlen > curnode.final):
+                #elif curnode.data is None or not curnode.final or final:
+                #elif curnode.data is None or not curnode.final:
                     curnode.data = keyid
+                    if originalprefixlen != 0:
+                        curnode.final = originalprefixlen
+                    else:
+                        curnode.final = prefixlen
+                    
+
+    def explore(self):
+        curnode = self.trie
+        toexplore = [curnode]
+        while len(toexplore) > 0:
+            curnode = toexplore.pop(0)
+            if curnode.left != None:
+                toexplore.append(curnode.left)
+            if curnode.right != None:
+                toexplore.append(curnode.right)
+            print('Node {node} | Left={left} | Right={right} | Data={data} | Final {final}'.format(node=curnode, 
+                left=curnode.left, right=curnode.right, data=curnode.data, final=curnode.final))
 
     def add_to_trie(self, ipnet, keyid, strict = True):
         ipnum = int(ipnet.network_address)
         m = ipnet.max_prefixlen
         ipnet.prefixlen
-        self._add_to_trie(ipnum, ipnet.prefixlen, ipnet.max_prefixlen, keyid, strict)
+        self._add_to_trie(ipnum, ipnet.prefixlen, ipnet.max_prefixlen, keyid, strict=strict)
 
     def add_data(self, d):
         self.data.append(d)
@@ -351,9 +378,31 @@ class Encoder():
         if fieldid > 7:
             fieldid_write = 0
 
-        tow = length&0x1f | (fieldid_write&0x7)<<5
+        length_mod = length
+        if length >= 65821:
+            length_mod = 31
+        elif length >= 285:
+            length_mod = 30
+        elif length >= 29:
+            length_mod = 29
+
+        tow = length_mod&0x1f | (fieldid_write&0x7)<<5
         Encoder._write_v(buf, tow)
-        written += 1 # When writing on a file, doesn't return anything
+        written += 1
+        
+        if length >= 65821:
+            Encoder._write_v(buf, (length - 65821)>>16&0xff)
+            Encoder._write_v(buf, (length - 65821)>>8&0xff)
+            Encoder._write_v(buf, (length - 65821)&0xff)
+            written += 3
+        elif length >= 285:
+            Encoder._write_v(buf, (length - 285)>>8&0xff)
+            Encoder._write_v(buf, (length - 285)&0xff)
+            written += 2
+        elif length >= 29:
+            Encoder._write_v(buf, length - 29)
+            written += 1 # When writing on a file, doesn't return anything
+
         if fieldid > 7:
             tow = fieldid-7
             Encoder._write_v(buf, tow)
